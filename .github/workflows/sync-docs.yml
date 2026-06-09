@@ -1,0 +1,28 @@
+name: Sync SharePoint Doc to Markdown
+
+on:
+  repository_dispatch:
+    types: [convert_docx_to_md]
+
+jobs:
+  convert_and_upload:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies
+        run: |
+          npm install mammoth turndown @microsoft/microsoft-graph-client isomorphic-fetch
+
+      - name: Run Round-Trip Script
+        env:
+          MS_GRAPH_TOKEN: ${{ secrets.MS_GRAPH_TOKEN }}
+          GITHUB_EVENT_PAYLOAD: ${{ toJson(github.event) }}
+        run: |
+          node .github/scripts/convert-docx.js
