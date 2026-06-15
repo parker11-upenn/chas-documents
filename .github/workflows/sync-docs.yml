@@ -1,4 +1,4 @@
-name: Sync SharePoint Doc to Markdown
+name: Sync SharePoint Doc to Markdown via Pandoc Link
 
 on:
   repository_dispatch:
@@ -14,24 +14,32 @@ jobs:
       - name: Checkout Repository Code
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install Converters
+      - name: Install Pandoc
         run: |
-          npm install mammoth turndown
+          sudo apt-get update
+          sudo apt-get install -y pandoc
 
-      - name: Run Conversion Script
+      - name: Download File via Shared Link and Convert
         env:
-          FILE_CONTENT_BASE64: ${{ github.event.client_payload.fileContent }}
+          DOWNLOAD_URL: ${{ github.event.client_payload.downloadUrl }}
           FILE_NAME: ${{ github.event.client_payload.fileName }}
         run: |
-          node .github/scripts/convert-payload.js
+          # 1. Append the download flag to the OneDrive/SharePoint sharing link
+          # This forces Microsoft to stream the raw file binary instead of rendering the web preview page
+          DIRECT_LINK="${DOWNLOAD_URL}&download=1"
+          
+          # 2. Download the physical file securely into the runner
+          curl -L -o temp_input.docx "$DIRECT_LINK"
+          
+          # 3. Process the Pandoc conversion
+          OUTPUT_NAME=$(echo "$FILE_NAME" | sed 's/\.docx$/\.md/')
+          mkdir -p docs
+          pandoc temp_input.docx -t markdown -o "docs/$OUTPUT_NAME"
+          
+          rm temp_input.docx
 
       - name: Auto-Commit Markdown Directly to Repository
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "chore: automatically updated markdown manual from SharePoint"
+          commit_message: "chore: automatically updated markdown manual via Pandoc Link"
           file_pattern: 'docs/*.md'
