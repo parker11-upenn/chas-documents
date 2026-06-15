@@ -1,0 +1,115 @@
+import Global from '../../_global.mdx';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# spo brandcenter colors list
+
+Lists the brand center colors
+
+## Usage
+
+```sh
+m365 spo brandcenter colors list [options]
+```
+
+## Options
+
+<Global />
+
+## Permissions
+
+<Tabs>
+  <TabItem value="Delegated">
+
+  | Resource   | Permissions   |
+  |------------|---------------|
+  | SharePoint | AllSites.Read |
+
+  </TabItem>
+  <TabItem value="Application">
+
+  | Resource   | Permissions    |
+  |------------|----------------|
+  | SharePoint | Sites.Read.All |
+
+  </TabItem>
+</Tabs>
+
+## Remarks
+
+If the brand colors list has not been created yet in the Brand Center, the command will return an empty array.
+
+## Examples
+
+List all brand center colors
+
+```sh
+m365 spo brandcenter colors list
+```
+
+## Response
+
+<Tabs>
+  <TabItem value="JSON">
+
+  ```json
+  [
+    {
+      "Title": "Primary",
+      "ColorCode": "#0078D4",
+      "IsVisible": true
+    },
+    {
+      "Title": "Secondary",
+      "ColorCode": "#FF4500",
+      "IsVisible": false
+    }
+  ]
+  ```
+
+  </TabItem>
+  <TabItem value="Text">
+
+  ```txt
+  Title      ColorCode  IsVisible
+  ---------  ---------  ---------
+  Primary    #0078D4    true
+  Secondary  #FF4500    false
+  ```
+
+  </TabItem>
+  <TabItem value="CSV">
+
+  ```csv
+  Title,ColorCode,IsVisible
+  Primary,#0078D4,true
+  Secondary,#FF4500,false
+  ```
+
+  </TabItem>
+  <TabItem value="Markdown">
+
+  ```md
+  # spo brandcenter colors list
+
+  Date: 4/4/2026
+
+  ## Primary
+
+  Property | Value
+  ---------|-------
+  Title | Primary
+  ColorCode | #0078D4
+  IsVisible | true
+
+  ## Secondary
+
+  Property | Value
+  ---------|-------
+  Title | Secondary
+  ColorCode | #FF4500
+  IsVisible | false
+  ```
+
+  </TabItem>
+</Tabs>

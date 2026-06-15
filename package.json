@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "@pnp/cli-microsoft365": "^11.8.0",
+    "mammoth": "^1.12.0",
+    "playwright": "^1.60.0",
+    "turndown": "^7.2.4"
+  }
+}

@@ -4,6 +4,9 @@ on:
   repository_dispatch:
     types: [convert_docx_to_md]
 
+permissions:
+  contents: write
+
 jobs:
   convert_and_upload:
     runs-on: ubuntu-latest
@@ -16,13 +19,19 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install Dependencies
+      - name: Install Converters
         run: |
-          npm install mammoth turndown @microsoft/microsoft-graph-client isomorphic-fetch
+          npm install mammoth turndown
 
-      - name: Run Round-Trip Script
+      - name: Run Conversion Script
         env:
-          MS_GRAPH_TOKEN: ${{ secrets.MS_GRAPH_TOKEN }}
-          GITHUB_EVENT_PAYLOAD: ${{ toJson(github.event) }}
+          FILE_CONTENT_BASE64: ${{ github.event.client_payload.fileContent }}
+          FILE_NAME: ${{ github.event.client_payload.fileName }}
         run: |
-          node .github/scripts/convert-docx.js
+          node .github/scripts/convert-payload.js
+
+      - name: Auto-Commit Markdown Directly to Repository
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: automatically updated markdown manual from SharePoint"
+          file_pattern: 'docs/*.md'
