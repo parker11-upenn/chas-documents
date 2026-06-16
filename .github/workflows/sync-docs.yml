@@ -1,4 +1,8 @@
-name: Sync SharePoint Doc to Markdown
+steps:
+      - name: Checkout Repository Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Ensures the runner pulls all recent history to prevent push rejections
 
 on:
   repository_dispatch:
