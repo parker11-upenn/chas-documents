@@ -1,4 +1,4 @@
-name: Sync SharePoint Doc to Markdown via Staging Link
+name: Sync SharePoint Doc to Markdown Natively
 
 on:
   repository_dispatch:
@@ -16,32 +16,36 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Download File from Sharing Link
-        env:
-          DOWNLOAD_URL: ${{ github.event.client_payload.downloadUrl }}
-        run: |
-          # Pull the file binary straight from the secure organization sharing link
-          curl -L -f -o temp_input.docx "$DOWNLOAD_URL"
-
       - name: Install Pandoc
         run: |
           sudo apt-get update
           sudo apt-get install -y pandoc
 
-      - name: Convert DOCX to Markdown
+      - name: Convert Local Staging File
         env:
           FILE_NAME: ${{ github.event.client_payload.fileName }}
         run: |
-          # Determine crisp markdown output title
+          # 1. Find the file that Power Automate just dropped into /staging
+          # (We look for any .docx file in the staging directory)
+          LOCAL_DOCX=$(ls staging/*.docx | head -n 1)
+          
+          if [ -z "$LOCAL_DOCX" ]; then
+            echo "Error: No .docx file found in the staging folder!"
+            exit 1
+          fi
+          
+          # 2. Determine clean output name for the docs folder
           OUTPUT_NAME=$(echo "$FILE_NAME" | sed 's/\.docx$/\.md/')
           mkdir -p docs
           
-          # Convert natively on local disk
-          pandoc temp_input.docx -t markdown -o "docs/$OUTPUT_NAME"
-          rm temp_input.docx
+          # 3. Convert natively using local files only
+          pandoc "$LOCAL_DOCX" -t markdown -o "docs/$OUTPUT_NAME"
+          
+          # 4. Clean up the staging folder so it stays empty for the next run
+          rm "$LOCAL_DOCX"
 
       - name: Auto-Commit Markdown Directly to Docs Folder
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "chore: automatically compiled markdown manual via staging link"
+          commit_message: "chore: automatically compiled markdown manual natively"
           file_pattern: 'docs/*.md'
