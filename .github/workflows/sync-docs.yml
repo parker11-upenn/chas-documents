@@ -1,4 +1,4 @@
-name: Sync SharePoint Doc to Markdown via Staging Folder
+name: Sync SharePoint Doc to Markdown
 
 on:
   repository_dispatch:
@@ -19,33 +19,26 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y pandoc
 
-      - name: Stream DOCX via API and Convert
+      - name: Unpack Incoming Binary and Convert
         env:
-          STAGING_PATH: ${{ github.event.client_payload.stagingPath }}
+          RAW_CONTENT: ${{ github.event.client_payload.fileContent }}
           FILE_NAME: ${{ github.event.client_payload.fileName }}
         run: |
-          # 1. Clean up slash syntax for the path string
-          INPUT_PATH=$(echo "$STAGING_PATH" | sed 's|^/\+||; s|^|/|')
-          CLEAN_PATH=$(echo "$INPUT_PATH" | sed 's| |%20|g')
+          # 1. Decode the base64 text stream back into a pristine binary Word file
+          echo "$RAW_CONTENT" | base64 --decode > temp_input.docx
           
-          # 2. Grab the file content via the secure endpoint stream
-          curl -L -f -o temp_input.docx "https://graph.microsoft.com/v1.0/me/drive/root:${CLEAN_PATH}:/content"
-          
-          # 3. Check for successful assembly
-          if [ ! -s temp_input.docx ]; then
-            echo "Error: Streamed file from SharePoint is empty or path calculation failed!"
-            exit 1
-          fi
-          
-          # 4. Pandoc processing
+          # 2. Determine output markdown filename
           OUTPUT_NAME=$(echo "$FILE_NAME" | sed 's/\.docx$/\.md/')
           mkdir -p docs
+          
+          # 3. Use Pandoc to convert the local file natively on disk
           pandoc temp_input.docx -t markdown -o "docs/$OUTPUT_NAME"
           
+          # 4. Tidy up the workspace
           rm temp_input.docx
 
       - name: Auto-Commit Markdown Directly to Docs Folder
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "chore: automatically compiled markdown manual via staging runner"
+          commit_message: "chore: automatically compiled markdown manual via payload runner"
           file_pattern: 'docs/*.md'
