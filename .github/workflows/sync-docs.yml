@@ -1,4 +1,4 @@
-name: Sync SharePoint Doc to Markdown via Staging Folder
+name: Sync SharePoint Doc to Markdown via Staging Link
 
 on:
   repository_dispatch:
@@ -16,16 +16,12 @@ jobs:
         with:
           fetch-depth: 0
 
-      # 1. Use a native SharePoint downloader to pull the file cleanly onto the disk
-      - name: Download File from SharePoint Staging
-        uses: jasonmaddox/sharepoint-download-action@v1
-        with:
-          sharepoint_site: "https://penno365.sharepoint.com/teams/CHAS-IRRedesignProject" # Your base site URL
-          file_path: ${{ github.event.client_payload.stagingPath }}
-          dest_path: "./temp_input.docx"
+      - name: Download File from Sharing Link
         env:
-          SP_USERNAME: ${{ secrets.SHAREPOINT_USERNAME }}
-          SP_PASSWORD: ${{ secrets.SHAREPOINT_PASSWORD }}
+          DOWNLOAD_URL: ${{ github.event.client_payload.downloadUrl }}
+        run: |
+          # Pull the file binary straight from the secure organization sharing link
+          curl -L -f -o temp_input.docx "$DOWNLOAD_URL"
 
       - name: Install Pandoc
         run: |
@@ -47,5 +43,5 @@ jobs:
       - name: Auto-Commit Markdown Directly to Docs Folder
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "chore: automatically compiled markdown manual via staging downloader"
+          commit_message: "chore: automatically compiled markdown manual via staging link"
           file_pattern: 'docs/*.md'
