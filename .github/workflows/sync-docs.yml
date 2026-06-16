@@ -1,45 +1,24 @@
-name: Sync SharePoint Doc to Markdown via Pandoc Link
-
-on:
-  repository_dispatch:
-    types: [convert_docx_to_md]
-
-permissions:
-  contents: write
-
-jobs:
-  convert_and_upload:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repository Code
-        uses: actions/checkout@v4
-
-      - name: Install Pandoc
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y pandoc
-
-      - name: Download File via Shared Link and Convert
+- name: Stream DOCX via API and Convert
         env:
-          DOWNLOAD_URL: ${{ github.event.client_payload.downloadUrl }}
+          STAGING_PATH: ${{ github.event.client_payload.stagingPath }}
           FILE_NAME: ${{ github.event.client_payload.fileName }}
         run: |
-          # 1. Append the download flag to the OneDrive/SharePoint sharing link
-          # This forces Microsoft to stream the raw file binary instead of rendering the web preview page
-          DIRECT_LINK="${DOWNLOAD_URL}&download=1"
+          # 1. Format spaces in the file path string so the web request doesn't fragment
+          CLEAN_PATH=$(echo "$STAGING_PATH" | sed 's| |%20|g')
           
-          # 2. Download the physical file securely into the runner
-          curl -L -o temp_input.docx "$DIRECT_LINK"
+          # 2. Pull the raw binary file stream using Microsoft's direct content endpoint
+          curl -L -o temp_input.docx "https://graph.microsoft.com/v1.0/me/drive/root:${CLEAN_PATH}:/content"
           
-          # 3. Process the Pandoc conversion
+          # 3. Verify the file actually arrived and isn't a corrupted HTML string
+          if [ ! -s temp_input.docx ]; then
+            echo "Error: Streamed file is empty or missing!"
+            exit 1
+          fi
+          
+          # 4. Process the Pandoc markdown compilation locally on disk
           OUTPUT_NAME=$(echo "$FILE_NAME" | sed 's/\.docx$/\.md/')
           mkdir -p docs
           pandoc temp_input.docx -t markdown -o "docs/$OUTPUT_NAME"
           
+          # 5. Clear out temporary workspace binary
           rm temp_input.docx
-
-      - name: Auto-Commit Markdown Directly to Repository
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "chore: automatically updated markdown manual via Pandoc Link"
-          file_pattern: 'docs/*.md'
