@@ -1,28 +1,51 @@
-- name: Stream DOCX via API and Convert
+name: Sync SharePoint Doc to Markdown via Staging Folder
+
+on:
+  repository_dispatch:
+    types: [convert_docx_to_md]
+
+permissions:
+  contents: write
+
+jobs:
+  convert_and_upload:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository Code
+        uses: actions/checkout@v4
+
+      - name: Install Pandoc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc
+
+      - name: Stream DOCX via API and Convert
         env:
           STAGING_PATH: ${{ github.event.client_payload.stagingPath }}
           FILE_NAME: ${{ github.event.client_payload.fileName }}
         run: |
-          # 1. Ensure the path has a single clean leading forward slash
-          # This fixes the malformed URL bug by transforming "Shared Documents/..." to "/Shared Documents/..."
+          # 1. Clean up slash syntax for the path string
           INPUT_PATH=$(echo "$STAGING_PATH" | sed 's|^/\+||; s|^|/|')
-          
-          # 2. URL-encode spaces securely so curl can read the web request smoothly
           CLEAN_PATH=$(echo "$INPUT_PATH" | sed 's| |%20|g')
           
-          # 3. Pull the raw binary file stream using Microsoft's direct content endpoint
+          # 2. Grab the file content via the secure endpoint stream
           curl -L -f -o temp_input.docx "https://graph.microsoft.com/v1.0/me/drive/root:${CLEAN_PATH}:/content"
           
-          # 4. Verify the file actually arrived and isn't a zero-byte layout
+          # 3. Check for successful assembly
           if [ ! -s temp_input.docx ]; then
             echo "Error: Streamed file from SharePoint is empty or path calculation failed!"
             exit 1
           fi
           
-          # 5. Process the Pandoc markdown compilation locally on disk
+          # 4. Pandoc processing
           OUTPUT_NAME=$(echo "$FILE_NAME" | sed 's/\.docx$/\.md/')
           mkdir -p docs
           pandoc temp_input.docx -t markdown -o "docs/$OUTPUT_NAME"
           
-          # 6. Clear out temporary workspace binary
           rm temp_input.docx
+
+      - name: Auto-Commit Markdown Directly to Docs Folder
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: automatically compiled markdown manual via staging runner"
+          file_pattern: 'docs/*.md'
