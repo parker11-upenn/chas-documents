@@ -1,8 +1,4 @@
-steps:
-      - name: Checkout Repository Code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # Ensures the runner pulls all recent history to prevent push rejections
+name: Sync SharePoint Doc to Markdown via Staging Folder
 
 on:
   repository_dispatch:
@@ -17,32 +13,39 @@ jobs:
     steps:
       - name: Checkout Repository Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 1. Use a native SharePoint downloader to pull the file cleanly onto the disk
+      - name: Download File from SharePoint Staging
+        uses: jasonmaddox/sharepoint-download-action@v1
+        with:
+          sharepoint_site: "https://penno365.sharepoint.com/teams/CHAS-IRRedesignProject" # Your base site URL
+          file_path: ${{ github.event.client_payload.stagingPath }}
+          dest_path: "./temp_input.docx"
+        env:
+          SP_USERNAME: ${{ secrets.SHAREPOINT_USERNAME }}
+          SP_PASSWORD: ${{ secrets.SHAREPOINT_PASSWORD }}
 
       - name: Install Pandoc
         run: |
           sudo apt-get update
           sudo apt-get install -y pandoc
 
-      - name: Unpack Incoming Binary and Convert
+      - name: Convert DOCX to Markdown
         env:
-          RAW_CONTENT: ${{ github.event.client_payload.fileContent }}
           FILE_NAME: ${{ github.event.client_payload.fileName }}
         run: |
-          # 1. Decode the base64 text stream back into a pristine binary Word file
-          echo "$RAW_CONTENT" | base64 --decode > temp_input.docx
-          
-          # 2. Determine output markdown filename
+          # Determine crisp markdown output title
           OUTPUT_NAME=$(echo "$FILE_NAME" | sed 's/\.docx$/\.md/')
           mkdir -p docs
           
-          # 3. Use Pandoc to convert the local file natively on disk
+          # Convert natively on local disk
           pandoc temp_input.docx -t markdown -o "docs/$OUTPUT_NAME"
-          
-          # 4. Tidy up the workspace
           rm temp_input.docx
 
       - name: Auto-Commit Markdown Directly to Docs Folder
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "chore: automatically compiled markdown manual via payload runner"
+          commit_message: "chore: automatically compiled markdown manual via staging downloader"
           file_pattern: 'docs/*.md'
