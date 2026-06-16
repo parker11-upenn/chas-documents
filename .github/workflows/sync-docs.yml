@@ -1,4 +1,4 @@
-name: Sync SharePoint Doc to Markdown Natively
+name: Sync SharePoint Doc to Markdown
 
 on:
   repository_dispatch:
@@ -21,31 +21,24 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y pandoc
 
-      - name: Convert Local Staging File
+      - name: Unpack Payload and Convert
         env:
+          RAW_CONTENT: ${{ github.event.client_payload.fileContent }}
           FILE_NAME: ${{ github.event.client_payload.fileName }}
         run: |
-          # 1. Find the file that Power Automate just dropped into /staging
-          # (We look for any .docx file in the staging directory)
-          LOCAL_DOCX=$(ls staging/*.docx | head -n 1)
+          # 1. Decode the incoming text string back into a real Word document
+          echo "$RAW_CONTENT" | base64 --decode > temp_input.docx
           
-          if [ -z "$LOCAL_DOCX" ]; then
-            echo "Error: No .docx file found in the staging folder!"
-            exit 1
-          fi
-          
-          # 2. Determine clean output name for the docs folder
+          # 2. Determine clean markdown output title
           OUTPUT_NAME=$(echo "$FILE_NAME" | sed 's/\.docx$/\.md/')
           mkdir -p docs
           
-          # 3. Convert natively using local files only
-          pandoc "$LOCAL_DOCX" -t markdown -o "docs/$OUTPUT_NAME"
-          
-          # 4. Clean up the staging folder so it stays empty for the next run
-          rm "$LOCAL_DOCX"
+          # 3. Convert natively on local disk
+          pandoc temp_input.docx -t markdown -o "docs/$OUTPUT_NAME"
+          rm temp_input.docx
 
       - name: Auto-Commit Markdown Directly to Docs Folder
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "chore: automatically compiled markdown manual natively"
+          commit_message: "chore: automatically compiled markdown manual via payload"
           file_pattern: 'docs/*.md'
