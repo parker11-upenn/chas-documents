@@ -30,43 +30,25 @@ jobs:
           echo "$RAW_CONTENT" | base64 --decode > temp_input.docx
           mkdir -p docs
           
-          # 2. Run an initial translation to a temporary markdown file so we can look inside it
-          pandoc temp_input.docx -t markdown -o temp_raw.md
-          
-          # 3. Smart Filename Detection:
-          # Check if the incoming payload name from Power Automate is completely empty or just spaces
+          # 2. Determine safe filename
+          # If the payload name is blank, null, or missing, fallback to a clean base name
           CLEAN_TITLE=$(echo "$PAYLOAD_NAME" | sed 's/[[:space:]]//g')
           
           if [ -z "$CLEAN_TITLE" ] || [ "$CLEAN_TITLE" = "null" ]; then
-            echo "Power Automate variable arrived empty! Extracting title from document headers..."
-            
-            # Read the first line of the file, strip out markdown headers (#), and keep alphanumeric characters
-            FIRST_LINE=$(head -n 1 temp_raw.md | sed 's/[#*`]//g' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-            
-            # If the first line is empty, try the second line (handles blank spacing)
-            if [ -z "$FIRST_LINE" ]; then
-              FIRST_LINE=$(sed -n '2p' temp_raw.md | sed 's/[#*`]//g' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-            fi
-            
-            # If we successfully found text in the document header, convert it to lowercase snake_case
-            if [ -not -z "$FIRST_LINE" ]; then
-              FINAL_FILENAME=$(echo "$FIRST_LINE" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--//g' | cut -c1-50)
-            else
-              # Ultimate absolute fallback timestamp if the document is completely empty text
-              FINAL_FILENAME="automated_manual_$(date +'%Y%m%d_%H%M%S')"
-            fi
+            echo "Filename missing from payload channel. Using fallback name with timestamp."
+            FINAL_FILENAME="automated_manual_$(date +'%Y%m%d_%H%M%S')"
           else
-            # If Power Automate actually sends a crisp string, clean it up and use it
+            # Clean up incoming spaces/underlines from a true live trigger string
             FINAL_FILENAME=$(echo "$PAYLOAD_NAME" | sed 's/%20/_/g' | sed 's/ /_/g' | sed 's|\.docx$||' | tr '[:upper:]' '[:lower:]')
           fi
           
-          # 4. Save the finalized file name with a clean .md extension
-          mv temp_raw.md "docs/${FINAL_FILENAME}.md"
+          # 3. Convert natively using Pandoc
+          pandoc temp_input.docx -t markdown -o "docs/${FINAL_FILENAME}.md"
           rm temp_input.docx
-          echo "Primage layout compiled successfully as: docs/${FINAL_FILENAME}.md"
+          echo "Success! Saved document to docs/${FINAL_FILENAME}.md"
 
       - name: Auto-Commit Markdown Directly to Docs Folder
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "chore: automatically compiled markdown manual with smart layout titles"
+          commit_message: "chore: automatically compiled markdown manual"
           file_pattern: 'docs/*.md'
