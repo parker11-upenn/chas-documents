@@ -29,11 +29,17 @@ jobs:
           # 1. Decode the incoming text string back into a real Word document
           echo "$RAW_CONTENT" | base64 --decode > temp_input.docx
           
-          # 2. Clean up any weird spaces or URL fragments
-          CLEAN_NAME=$(echo "$FILE_NAME" | sed 's/%20/_/g')
+          # 2. Check if fileName is blank; if so, default to a clean fallback name
+          TARGET_NAME="${FILE_NAME}"
+          if [ -z "$TARGET_NAME" ]; then
+            TARGET_NAME="compiled_manual_document.docx"
+          fi
+          
+          # 3. Clean up spaces and drop the extension
+          CLEAN_NAME=$(echo "$TARGET_NAME" | sed 's/%20/_/g' | sed 's/ /_/g' | sed 's|\.docx$||')
           mkdir -p docs
           
-          # 3. Convert natively on local disk, appending the clean .md extension
+          # 4. Convert natively on local disk
           pandoc temp_input.docx -t markdown -o "docs/${CLEAN_NAME}.md"
           rm temp_input.docx
 
