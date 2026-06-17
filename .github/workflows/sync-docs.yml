@@ -29,9 +29,8 @@ jobs:
           # 1. Decode the incoming text string back into a real Word document
           echo "$RAW_CONTENT" | base64 --decode > temp_input.docx
           
-          # 2. Clean the filename: turn %20 into regular spaces/hyphens as preferred, 
-          # and cleanly strip off the .docx extension safely
-          CLEAN_NAME=$(echo "$FILE_NAME" | sed 's/%20/ /g' | sed 's|\.docx$||')
+          # 2. Clean up any weird spaces or URL fragments
+          CLEAN_NAME=$(echo "$FILE_NAME" | sed 's/%20/_/g')
           mkdir -p docs
           
           # 3. Convert natively on local disk, appending the clean .md extension
