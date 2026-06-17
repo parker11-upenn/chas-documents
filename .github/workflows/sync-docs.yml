@@ -29,12 +29,13 @@ jobs:
           # 1. Decode the incoming text string back into a real Word document
           echo "$RAW_CONTENT" | base64 --decode > temp_input.docx
           
-          # 2. Clean the filename: replace %20 with a hyphen and swap the extension
-          CLEAN_NAME=$(echo "$FILE_NAME" | sed 's/%20/-/g' | sed 's/\.docx$/\.md/')
+          # 2. Clean the filename: replace %20 with hyphens, and safely drop the .docx extension
+          # Using | as a separator prevents the terminal from throwing an 'unterminated s' error
+          CLEAN_NAME=$(echo "$FILE_NAME" | sed 's/%20/-/g' | sed 's|\.docx$||')
           mkdir -p docs
           
-          # 3. Convert natively on local disk
-          pandoc temp_input.docx -t markdown -o "docs/$CLEAN_NAME"
+          # 3. Convert natively on local disk, appending the clean .md extension
+          pandoc temp_input.docx -t markdown -o "docs/${CLEAN_NAME}.md"
           rm temp_input.docx
 
       - name: Auto-Commit Markdown Directly to Docs Folder
