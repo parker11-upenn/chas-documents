@@ -21,30 +21,52 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y pandoc
 
-      - name: Unpack Payload and Convert
+      - name: Unpack Payload and Convert Natively
         env:
           RAW_CONTENT: ${{ github.event.client_payload.fileContent }}
-          FILE_NAME: ${{ github.event.client_payload.fileName }}
+          PAYLOAD_NAME: ${{ github.event.client_payload.fileName }}
         run: |
-          # 1. Decode the incoming text string back into a real Word document
+          # 1. Decode the document binary to disk
           echo "$RAW_CONTENT" | base64 --decode > temp_input.docx
-          
-          # 2. Check if fileName is blank; if so, default to a clean fallback name
-          TARGET_NAME="${FILE_NAME}"
-          if [ -z "$TARGET_NAME" ]; then
-            TARGET_NAME="compiled_manual_document.docx"
-          fi
-          
-          # 3. Clean up spaces and drop the extension
-          CLEAN_NAME=$(echo "$TARGET_NAME" | sed 's/%20/_/g' | sed 's/ /_/g' | sed 's|\.docx$||')
           mkdir -p docs
           
-          # 4. Convert natively on local disk
-          pandoc temp_input.docx -t markdown -o "docs/${CLEAN_NAME}.md"
+          # 2. Run an initial translation to a temporary markdown file so we can look inside it
+          pandoc temp_input.docx -t markdown -o temp_raw.md
+          
+          # 3. Smart Filename Detection:
+          # Check if the incoming payload name from Power Automate is completely empty or just spaces
+          CLEAN_TITLE=$(echo "$PAYLOAD_NAME" | sed 's/[[:space:]]//g')
+          
+          if [ -z "$CLEAN_TITLE" ] || [ "$CLEAN_TITLE" = "null" ]; then
+            echo "Power Automate variable arrived empty! Extracting title from document headers..."
+            
+            # Read the first line of the file, strip out markdown headers (#), and keep alphanumeric characters
+            FIRST_LINE=$(head -n 1 temp_raw.md | sed 's/[#*`]//g' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+            
+            # If the first line is empty, try the second line (handles blank spacing)
+            if [ -z "$FIRST_LINE" ]; then
+              FIRST_LINE=$(sed -n '2p' temp_raw.md | sed 's/[#*`]//g' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+            fi
+            
+            # If we successfully found text in the document header, convert it to lowercase snake_case
+            if [ -not -z "$FIRST_LINE" ]; then
+              FINAL_FILENAME=$(echo "$FIRST_LINE" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--//g' | cut -c1-50)
+            else
+              # Ultimate absolute fallback timestamp if the document is completely empty text
+              FINAL_FILENAME="automated_manual_$(date +'%Y%m%d_%H%M%S')"
+            fi
+          else
+            # If Power Automate actually sends a crisp string, clean it up and use it
+            FINAL_FILENAME=$(echo "$PAYLOAD_NAME" | sed 's/%20/_/g' | sed 's/ /_/g' | sed 's|\.docx$||' | tr '[:upper:]' '[:lower:]')
+          fi
+          
+          # 4. Save the finalized file name with a clean .md extension
+          mv temp_raw.md "docs/${FINAL_FILENAME}.md"
           rm temp_input.docx
+          echo "Primage layout compiled successfully as: docs/${FINAL_FILENAME}.md"
 
       - name: Auto-Commit Markdown Directly to Docs Folder
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "chore: automatically compiled markdown manual via payload"
+          commit_message: "chore: automatically compiled markdown manual with smart layout titles"
           file_pattern: 'docs/*.md'
